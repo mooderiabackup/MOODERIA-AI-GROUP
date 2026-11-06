@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { useBrain } from '../context/BrainContext';
 import { testMooderiaMcpAuthentication } from '../lib/supabase';
@@ -14,6 +12,7 @@ import {
   Lock,
   Activity,
   Cpu,
+  Database,
 } from 'lucide-react';
 
 export const McpConfigModal: React.FC = () => {
@@ -38,6 +37,12 @@ export const McpConfigModal: React.FC = () => {
     serverVersion?: string | null;
     protocolVersion?: string | null;
     capabilities?: Record<string, unknown>;
+    tools?: Array<{
+      name: string;
+      description: string;
+    }>;
+    toolCount?: number;
+    sessionIdPresent?: boolean;
   } | null>(null);
 
   if (!selectedMcpSlot) return null;
@@ -60,11 +65,14 @@ export const McpConfigModal: React.FC = () => {
         serverVersion: result.server_version,
         protocolVersion: result.protocol_version,
         capabilities: result.capabilities,
+        tools: result.tools,
+        toolCount: result.tool_count,
+        sessionIdPresent: result.session_id_present,
       });
     } catch {
       setFeedback({
         ok: false,
-        message: 'MCP initialization encountered an unexpected error.',
+        message: 'MCP initialization and tools verification encountered an unexpected error.',
       });
     } finally {
       setIsTesting(false);
@@ -140,8 +148,8 @@ export const McpConfigModal: React.FC = () => {
               <p className="font-bold">Authenticated MCP Server Test</p>
               <p className="text-purple-700 mt-1">
                 This test uses your existing Supabase session to initialize
-                the actual MCP protocol. Your access token stays inside
-                the application and is never displayed or copied.
+                the actual MCP protocol and retrieve the available memory
+                tools. Your access token stays inside the application.
               </p>
             </div>
           </div>
@@ -168,6 +176,10 @@ export const McpConfigModal: React.FC = () => {
 
             <p className="text-xs text-slate-600 mt-2">
               MCP initialization: {feedback?.ok ? 'Successful' : 'Not yet verified'}
+            </p>
+
+            <p className="text-xs text-slate-600 mt-2">
+              Memory tools: {feedback?.ok && feedback.tools ? `${feedback.toolCount} retrieved` : 'Not yet verified'}
             </p>
 
             <p className="text-xs text-slate-600 mt-2">
@@ -218,12 +230,51 @@ export const McpConfigModal: React.FC = () => {
                 <p>Protocol version: {feedback.protocolVersion}</p>
               )}
 
+              {feedback.sessionIdPresent !== undefined && (
+                <p>
+                  MCP session ID: {feedback.sessionIdPresent ? 'Present' : 'Not provided'}
+                </p>
+              )}
+
               {feedback.capabilities && (
                 <div className="mt-1">
                   <p className="font-bold mb-1">Server capabilities:</p>
                   <pre className="whitespace-pre-wrap break-all text-[10px]">
                     {JSON.stringify(feedback.capabilities, null, 2)}
                   </pre>
+                </div>
+              )}
+
+              {feedback.tools && (
+                <div className="mt-2 border-t border-emerald-200 pt-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Database className="w-4 h-4" />
+                    <p className="font-bold">
+                      Registered MCP Memory Tools ({feedback.toolCount})
+                    </p>
+                  </div>
+
+                  {feedback.tools.length === 0 ? (
+                    <p>No tools were returned by the server.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {feedback.tools.map((tool, index) => (
+                        <div
+                          key={`${tool.name}-${index}`}
+                          className="p-2.5 rounded-lg bg-white/70 border border-emerald-200"
+                        >
+                          <p className="font-bold break-all">
+                            {index + 1}. {tool.name}
+                          </p>
+                          {tool.description && (
+                            <p className="text-[10px] mt-1 opacity-80">
+                              {tool.description}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -237,7 +288,7 @@ export const McpConfigModal: React.FC = () => {
               className="w-full py-3 px-4 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${isTesting ? 'animate-spin' : ''}`} />
-              {isTesting ? 'Initializing MCP...' : 'Test MCP Initialization'}
+              {isTesting ? 'Testing MCP Tools...' : 'Test MCP Initialization & Tools'}
             </button>
 
             {!selectedMcpSlot.is_registered_in_db && (
@@ -254,12 +305,12 @@ export const McpConfigModal: React.FC = () => {
 
           <div className="flex items-center gap-2 text-[10px] text-slate-500">
             <Activity className="w-3.5 h-3.5" />
-            <span>Server initialization verified separately from Claude client connection.</span>
+            <span>Server initialization and memory tool discovery are verified separately from Claude client connection.</span>
           </div>
 
           <div className="flex items-center gap-2 text-[10px] text-slate-500">
             <Cpu className="w-3.5 h-3.5" />
-            <span>Memory tools still require a separate tools/list verification.</span>
+            <span>This test only lists tools. It does not modify stored memories.</span>
           </div>
 
         </div>
