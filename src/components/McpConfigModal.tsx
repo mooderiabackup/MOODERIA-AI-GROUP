@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useBrain } from '../context/BrainContext';
 import { testMooderiaMcpAuthentication } from '../lib/supabase';
@@ -11,6 +12,8 @@ import {
   AlertCircle,
   Server,
   Lock,
+  Activity,
+  Cpu,
 } from 'lucide-react';
 
 export const McpConfigModal: React.FC = () => {
@@ -30,9 +33,11 @@ export const McpConfigModal: React.FC = () => {
   const [feedback, setFeedback] = useState<{
     ok: boolean;
     message: string;
-    userId?: string | null;
-    brainOwnerId?: string | null;
     status?: number;
+    serverName?: string | null;
+    serverVersion?: string | null;
+    protocolVersion?: string | null;
+    capabilities?: Record<string, unknown>;
   } | null>(null);
 
   if (!selectedMcpSlot) return null;
@@ -50,14 +55,16 @@ export const McpConfigModal: React.FC = () => {
       setFeedback({
         ok: result.success,
         message: result.message,
-        userId: result.user_id,
-        brainOwnerId: result.brain_owner_id,
         status: result.status,
+        serverName: result.server_name,
+        serverVersion: result.server_version,
+        protocolVersion: result.protocol_version,
+        capabilities: result.capabilities,
       });
     } catch {
       setFeedback({
         ok: false,
-        message: 'Authentication test encountered an unexpected error.',
+        message: 'MCP initialization encountered an unexpected error.',
       });
     } finally {
       setIsTesting(false);
@@ -130,11 +137,11 @@ export const McpConfigModal: React.FC = () => {
           <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-100 flex items-start gap-3">
             <ShieldCheck className="w-5 h-5 text-purple-700 shrink-0" />
             <div className="text-xs text-purple-900">
-              <p className="font-bold">Secure Authentication Test</p>
+              <p className="font-bold">Authenticated MCP Server Test</p>
               <p className="text-purple-700 mt-1">
-                The test uses your existing Supabase login session.
-                Your access token stays inside the application and is
-                never displayed or copied.
+                This test uses your existing Supabase session to initialize
+                the actual MCP protocol. Your access token stays inside
+                the application and is never displayed or copied.
               </p>
             </div>
           </div>
@@ -155,12 +162,16 @@ export const McpConfigModal: React.FC = () => {
               Connection status
             </p>
 
-            <p className="text-xs text-slate-600 mt-1">
+            <p className="text-xs text-slate-600 mt-2">
               Authentication: {session ? 'Signed in' : 'Not signed in'}
             </p>
 
-            <p className="text-xs text-slate-600 mt-1">
-              MCP protocol: Not implemented yet
+            <p className="text-xs text-slate-600 mt-2">
+              MCP initialization: {feedback?.ok ? 'Successful' : 'Not yet verified'}
+            </p>
+
+            <p className="text-xs text-slate-600 mt-2">
+              Claude client connection: Not yet connected
             </p>
           </div>
 
@@ -195,16 +206,25 @@ export const McpConfigModal: React.FC = () => {
                 <p>HTTP status: {feedback.status}</p>
               )}
 
-              {feedback.userId && (
-                <p className="break-all">
-                  Authenticated user ID: {feedback.userId}
-                </p>
+              {feedback.serverName && (
+                <p>Server name: {feedback.serverName}</p>
               )}
 
-              {feedback.brainOwnerId && (
-                <p className="break-all">
-                  Brain Owner ID: {feedback.brainOwnerId}
-                </p>
+              {feedback.serverVersion && (
+                <p>Server version: {feedback.serverVersion}</p>
+              )}
+
+              {feedback.protocolVersion && (
+                <p>Protocol version: {feedback.protocolVersion}</p>
+              )}
+
+              {feedback.capabilities && (
+                <div className="mt-1">
+                  <p className="font-bold mb-1">Server capabilities:</p>
+                  <pre className="whitespace-pre-wrap break-all text-[10px]">
+                    {JSON.stringify(feedback.capabilities, null, 2)}
+                  </pre>
+                </div>
               )}
             </div>
           )}
@@ -217,7 +237,7 @@ export const McpConfigModal: React.FC = () => {
               className="w-full py-3 px-4 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${isTesting ? 'animate-spin' : ''}`} />
-              {isTesting ? 'Testing Authentication...' : 'Test Authentication'}
+              {isTesting ? 'Initializing MCP...' : 'Test MCP Initialization'}
             </button>
 
             {!selectedMcpSlot.is_registered_in_db && (
@@ -231,6 +251,17 @@ export const McpConfigModal: React.FC = () => {
             )}
 
           </div>
+
+          <div className="flex items-center gap-2 text-[10px] text-slate-500">
+            <Activity className="w-3.5 h-3.5" />
+            <span>Server initialization verified separately from Claude client connection.</span>
+          </div>
+
+          <div className="flex items-center gap-2 text-[10px] text-slate-500">
+            <Cpu className="w-3.5 h-3.5" />
+            <span>Memory tools still require a separate tools/list verification.</span>
+          </div>
+
         </div>
       </div>
     </div>
