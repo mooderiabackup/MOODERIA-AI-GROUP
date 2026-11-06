@@ -23,7 +23,7 @@ import {
   rpcDeleteMemory,
   rpcRegisterBrainAccount,
   rpcCurrentBrainOwner,
-  pingMcpEdgeFunction,
+  testMooderiaMcpAuthentication,
 } from '../lib/supabase';
 
 import { User, Session } from '@supabase/supabase-js';
@@ -34,6 +34,7 @@ export type NavigationTab =
   | 'accounts'
   | 'projects'
   | 'activity'
+  | 'shared'
   | 'settings';
 
 interface SupabaseStatus {
@@ -776,61 +777,91 @@ export function BrainProvider({
   };
 
   const verifyMcpConnection = async (
-    slotNumber: number
-  ): Promise<{ ok: boolean; message: string }> => {
-    const target = accounts.find(
-      (account) => account.slot_number === slotNumber
-    );
+  slotNumber: number
+): Promise<{ ok: boolean; message: string }> => {
+  const target = accounts.find(
+    (account) => account.slot_number === slotNumber
+  );
 
-    if (!target) {
-      return {
-        ok: false,
-        message: 'Invalid account slot.',
-      };
+  if (!target) {
+    return { ok: false, message: 'Account slot not found.' };
+  }
+
+  if (!target.is_registered_in_db) {
+    return { ok: false, message: 'Account is not registered.' };
+  }
+
+  if (!session?.access_token) {
+    return { ok: false, message: 'Please connect to Supabase first.' };
+  }
+
+  setAccounts((prev) =>
+    prev.map((account) =>
+      account.slot_number === slotNumber
+        ? {
+            ...account,
+            mcp_connection_state: 'awaiting_handshake',
+            status_message: 'Testing MOODERIA MCP server...',
+          }
+        : account
+    )
+  );
+
+  try {
+    const result = await testMooderiaMcpAuthentication();
+
+    if (!result.success) {
+      setAccounts((prev) =>
+        prev.map((account) =>
+          account.slot_number === slotNumber
+            ? {
+                ...account,
+                mcp_connection_state: 'not_connected',
+                status_message: `MCP verification failed: ${result.message}`,
+              }
+            : account
+        )
+      );
+
+      return { ok: false, message: result.message };
     }
 
-    if (!target.is_registered_in_db) {
-      return {
-        ok: false,
-        message: 'Register this account before testing API access.',
-      };
-    }
+    const message =
+      `MOODERIA MCP server online. ${result.tool_count ?? 0} tools verified. ` +
+      'This check verifies the dashboard login, not an individual Claude session.';
 
-    if (!session?.access_token) {
-      return {
-        ok: false,
-        message: 'Please sign in first.',
-      };
-    }
-
-    const ping = await pingMcpEdgeFunction(
-      target.account_name,
-      session.access_token
-    );
-
-    // API health is NOT an MCP handshake.
-    // Never mark this account as MCP-connected here.
-    setAccounts((previous) =>
-      previous.map((account) =>
+    setAccounts((prev) =>
+      prev.map((account) =>
         account.slot_number === slotNumber
           ? {
               ...account,
-              mcp_connection_state: 'not_connected',
-              status_message: ping.ok
-                ? `AI Brain API reachable (HTTP ${ping.status}). Actual MCP handshake not verified.`
-                : `AI Brain API health check failed: ${ping.message}`,
+              mcp_connection_state: 'connected',
+              status_message: message,
             }
           : account
       )
     );
 
-    return {
-      ok: ping.ok,
-      message: ping.ok
-        ? `AI Brain API is reachable (HTTP ${ping.status}). This does not confirm an MCP connection.`
-        : ping.message,
-    };
-  };
+    return { ok: true, message };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unknown verification error.';
+
+    setAccounts((prev) =>
+      prev.map((account) =>
+        account.slot_number === slotNumber
+          ? {
+              ...account,
+              mcp_connection_state: 'not_connected',
+              status_message: message,
+            }
+          : account
+      )
+    );
+
+    return { ok: false, message };
+  }
+};
 
   const refreshBrainData = async () => {
     await loadAllSupabaseData();
