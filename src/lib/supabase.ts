@@ -22,11 +22,7 @@ export function getSupabaseCredentials(): {
   const url = (localUrl || envUrl).trim();
   const anonKey = (localKey || envKey).trim();
 
-  const isConfigured = Boolean(
-    url &&
-    anonKey &&
-    /^https:\/\/.+/.test(url)
-  );
+  const isConfigured = Boolean(url && anonKey && /^https:\/\/.+/.test(url));
 
   return { url, anonKey, isConfigured };
 }
@@ -106,8 +102,6 @@ export async function testSupabaseConnection(
   }
 }
 
-// API health check only.
-// This does NOT verify an actual Claude MCP connection.
 export async function pingMcpEdgeFunction(
   _accountName: string,
   accessToken?: string
@@ -157,11 +151,6 @@ export async function pingMcpEdgeFunction(
   }
 }
 
-// --------------------------------------------------
-// Exact existing PostgreSQL RPC function signatures
-// No speculative parameter retries.
-// --------------------------------------------------
-
 export async function rpcRegisterBrainAccount(params: {
   authUserId: string;
   accountName: string;
@@ -169,9 +158,7 @@ export async function rpcRegisterBrainAccount(params: {
 }) {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('register_brain_account', {
     p_auth_user_id: params.authUserId,
@@ -179,9 +166,7 @@ export async function rpcRegisterBrainAccount(params: {
     p_provider: params.provider || 'Claude',
   });
 
-  if (error) {
-    throw new Error(`Account registration failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Account registration failed: ${error.message}`);
 
   return data;
 }
@@ -197,9 +182,7 @@ export async function rpcSaveMemory(params: {
 }) {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('save_memory', {
     p_category: params.category,
@@ -211,9 +194,7 @@ export async function rpcSaveMemory(params: {
     p_source_account_id: params.source_account_id ?? null,
   });
 
-  if (error) {
-    throw new Error(`Memory save failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Memory save failed: ${error.message}`);
 
   return data;
 }
@@ -226,9 +207,7 @@ export async function rpcSearchMemory(params: {
 }) {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('search_memory', {
     p_query: params.query,
@@ -237,9 +216,7 @@ export async function rpcSearchMemory(params: {
     p_limit: params.limit ?? 10,
   });
 
-  if (error) {
-    throw new Error(`Memory search failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Memory search failed: ${error.message}`);
 
   return data;
 }
@@ -247,17 +224,13 @@ export async function rpcSearchMemory(params: {
 export async function rpcGetMemory(memoryId: string) {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('get_memory', {
     p_memory_id: memoryId,
   });
 
-  if (error) {
-    throw new Error(`Get memory failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Get memory failed: ${error.message}`);
 
   return data;
 }
@@ -272,9 +245,7 @@ export async function rpcUpdateMemory(params: {
 }) {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('update_memory', {
     p_memory_id: params.memoryId,
@@ -285,9 +256,7 @@ export async function rpcUpdateMemory(params: {
     p_importance: params.importance ?? null,
   });
 
-  if (error) {
-    throw new Error(`Memory update failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Memory update failed: ${error.message}`);
 
   return data;
 }
@@ -295,17 +264,13 @@ export async function rpcUpdateMemory(params: {
 export async function rpcDeleteMemory(memoryId: string) {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('delete_memory', {
     p_memory_id: memoryId,
   });
 
-  if (error) {
-    throw new Error(`Memory deletion failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Memory deletion failed: ${error.message}`);
 
   return data;
 }
@@ -313,17 +278,13 @@ export async function rpcDeleteMemory(memoryId: string) {
 export async function rpcRestoreMemory(memoryId: string) {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('restore_memory', {
     p_memory_id: memoryId,
   });
 
-  if (error) {
-    throw new Error(`Memory restoration failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Memory restoration failed: ${error.message}`);
 
   return data;
 }
@@ -334,18 +295,14 @@ export async function rpcGetMemoryHistory(
 ) {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('get_memory_history', {
     p_memory_id: memoryId,
     p_limit: limit,
   });
 
-  if (error) {
-    throw new Error(`Memory history failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Memory history failed: ${error.message}`);
 
   return data;
 }
@@ -353,19 +310,13 @@ export async function rpcGetMemoryHistory(
 export async function rpcCurrentBrainOwner(): Promise<string> {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('current_brain_owner');
 
-  if (error) {
-    throw new Error(`Could not resolve brain owner: ${error.message}`);
-  }
+  if (error) throw new Error(`Could not resolve brain owner: ${error.message}`);
 
-  if (!data) {
-    throw new Error('No brain owner is available for this session');
-  }
+  if (!data) throw new Error('No brain owner is available for this session');
 
   return data as string;
 }
@@ -375,17 +326,13 @@ export async function rpcHasBrainAccess(
 ): Promise<boolean> {
   const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error('Supabase client not configured');
-  }
+  if (!client) throw new Error('Supabase client not configured');
 
   const { data, error } = await client.rpc('has_brain_access', {
     target_owner: targetOwner,
   });
 
-  if (error) {
-    throw new Error(`Brain access verification failed: ${error.message}`);
-  }
+  if (error) throw new Error(`Brain access verification failed: ${error.message}`);
 
   return data === true;
 }
@@ -395,7 +342,10 @@ export async function testMooderiaMcpAuthentication() {
   const { url, anonKey, isConfigured } = getSupabaseCredentials();
 
   if (!client || !isConfigured) {
-    return { success: false, message: 'Supabase is not configured' };
+    return {
+      success: false,
+      message: 'Supabase is not configured',
+    };
   }
 
   const { data: sessionData, error: sessionError } =
@@ -415,28 +365,87 @@ export async function testMooderiaMcpAuthentication() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
           'Authorization': `Bearer ${sessionData.session.access_token}`,
           'apikey': anonKey,
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-03-26',
+            capabilities: {},
+            clientInfo: {
+              name: 'mooderia-dashboard-test',
+              version: '1.0.0',
+            },
+          },
+        }),
       }
     );
 
-    const result = await response.json();
+    const responseText = await response.text();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        status: response.status,
+        message: `MCP request failed: ${responseText.slice(0, 1000)}`,
+      };
+    }
+
+    let result: any = null;
+
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      const dataLine = responseText
+        .split('\n')
+        .find((line) => line.startsWith('data:'));
+
+      if (dataLine) {
+        try {
+          result = JSON.parse(dataLine.slice(5).trim());
+        } catch {
+          result = null;
+        }
+      }
+    }
+
+    if (result?.error) {
+      return {
+        success: false,
+        status: response.status,
+        message: result.error.message || 'MCP initialization failed',
+      };
+    }
+
+    const serverInfo = result?.result?.serverInfo;
+    const protocolVersion = result?.result?.protocolVersion;
+
+    if (!serverInfo || !protocolVersion) {
+      return {
+        success: false,
+        status: response.status,
+        message: `MCP responded, but initialization was not confirmed: ${responseText.slice(0, 1000)}`,
+      };
+    }
 
     return {
-      success: response.ok && result.success === true,
+      success: true,
       status: response.status,
-      message: response.ok
-        ? 'Authenticated successfully'
-        : result.error || 'Authentication test failed',
-      user_id: result.user_id || null,
-      brain_owner_id: result.brain_owner_id || null,
+      message: 'MCP initialization successful',
+      server_name: serverInfo.name || null,
+      server_version: serverInfo.version || null,
+      protocol_version: protocolVersion,
+      capabilities: result.result.capabilities || {},
     };
-  } catch {
+  } catch (error: any) {
     return {
       success: false,
-      message: 'Could not reach the MOODERIA MCP endpoint',
+      status: 0,
+      message: error?.message || 'Could not reach the MOODERIA MCP endpoint',
     };
   }
 }
