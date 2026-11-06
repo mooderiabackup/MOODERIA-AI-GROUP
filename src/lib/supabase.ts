@@ -1,4 +1,3 @@
-
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 export function getSupabaseCredentials(): {
@@ -358,88 +357,188 @@ export async function testMooderiaMcpAuthentication() {
     };
   }
 
-  try {
-    const response = await fetch(
-      `${url.replace(/\/$/, '')}/functions/v1/mooderia-mcp`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json, text/event-stream',
-          'Authorization': `Bearer ${sessionData.session.access_token}`,
-          'apikey': anonKey,
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'initialize',
-          params: {
-            protocolVersion: '2025-03-26',
-            capabilities: {},
-            clientInfo: {
-              name: 'mooderia-dashboard-test',
-              version: '1.0.0',
-            },
-          },
-        }),
-      }
-    );
+  const endpoint = `${url.replace(/\/$/, '')}/functions/v1/mooderia-mcp`;
+  const accessToken = sessionData.session.access_token;
+
+  const parseResponse = (responseText: string): any[] => {
+    try {
+      return [JSON.parse(responseText)];
+    } catch {
+      return responseText
+        .split('\n')
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => {
+          try {
+            return JSON.parse(line.slice(5).trim());
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+    }
+  };
+
+  const sendRequest = async (
+    body: Record<string, any>,
+    sessionId?: string
+  ) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+      'Authorization': `Bearer ${accessToken}`,
+      'apikey': anonKey,
+    };
+
+    if (sessionId) {
+      headers['mcp-session-id'] = sessionId;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
 
     const responseText = await response.text();
 
-    if (!response.ok) {
+    return {
+      response,
+      responseText,
+      messages: parseResponse(responseText),
+    };
+  };
+
+  try {
+    const initialize = await sendRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-03-26',
+        capabilities: {},
+        clientInfo: {
+          name: 'mooderia-dashboard-test',
+          version: '1.0.0',
+        },
+      },
+    });
+
+    if (!initialize.response.ok) {
       return {
         success: false,
-        status: response.status,
-        message: `MCP request failed: ${responseText.slice(0, 1000)}`,
+        status: initialize.response.status,
+        message: `MCP initialization failed: ${initialize.responseText.slice(0, 1000)}`,
       };
     }
 
-    let result: any = null;
+    const initMessage = initialize.messages.find(
+      (message) => message.id === 1
+    );
 
-    try {
-      result = JSON.parse(responseText);
-    } catch {
-      const dataLine = responseText
-        .split('\n')
-        .find((line) => line.startsWith('data:'));
-
-      if (dataLine) {
-        try {
-          result = JSON.parse(dataLine.slice(5).trim());
-        } catch {
-          result = null;
-        }
-      }
-    }
-
-    if (result?.error) {
+    if (initMessage?.error) {
       return {
         success: false,
-        status: response.status,
-        message: result.error.message || 'MCP initialization failed',
+        status: initialize.response.status,
+        message: initMessage.error.message || 'MCP initialization failed',
       };
     }
 
-    const serverInfo = result?.result?.serverInfo;
-    const protocolVersion = result?.result?.protocolVersion;
+    const serverInfo = initMessage?.result?.serverInfo;
+    const protocolVersion = initMessage?.result?.protocolVersion;
 
     if (!serverInfo || !protocolVersion) {
       return {
         success: false,
-        status: response.status,
-        message: `MCP responded, but initialization was not confirmed: ${responseText.slice(0, 1000)}`,
+        status: initialize.response.status,
+        message: `MCP initialization was not confirmed: ${initialize.responseText.slice(0, 1000)}`,
       };
     }
 
+    const sessionId =
+      initialize.response.headers.get('mcp-session-id') || undefined;
+
+    const initialized = await sendRequest(
+      {
+        jsonrpc: '2.0',
+        method: 'notifications/initialized',
+      },
+      sessionId
+    );
+
+    if (!initialized.response.ok && initialized.response.status !== 202) {
+      return {
+        success: false,
+        status: initialized.response.status,
+        message: `MCP initialized notification failed: ${initialized.responseText.slice(0, 1000)}`,
+      };
+    }
+
+    let allTools: any[] = [];
+    let cursor: string | undefined;
+    let pageCount = 0;
+
+    do {
+      const requestId = 2 + pageCount;
+
+      const toolsResponse = await sendRequest(
+        {
+          jsonrpc: '2.0',
+          id: requestId,
+          method: 'tools/list',
+          params: cursor ? { cursor } : {},
+        },
+        sessionId
+      );
+
+      if (!toolsResponse.response.ok) {
+        return {
+          success: false,
+          status: toolsResponse.response.status,
+          message: `Could not retrieve MCP tools: ${toolsResponse.responseText.slice(0, 1000)}`,
+        };
+      }
+
+      const toolsMessage = toolsResponse.messages.find(
+        (message) => message.id === requestId
+      );
+
+      if (toolsMessage?.error) {
+        return {
+          success: false,
+          status: toolsResponse.response.status,
+          message: toolsMessage.error.message || 'MCP tools/list failed',
+        };
+      }
+
+      const pageTools = toolsMessage?.result?.tools;
+
+      if (!Array.isArray(pageTools)) {
+        return {
+          success: false,
+          status: toolsResponse.response.status,
+          message: `MCP did not return a valid tools list: ${toolsResponse.responseText.slice(0, 1000)}`,
+        };
+      }
+
+      allTools = allTools.concat(pageTools);
+      cursor = toolsMessage.result.nextCursor || undefined;
+      pageCount += 1;
+    } while (cursor && pageCount < 20);
+
     return {
       success: true,
-      status: response.status,
-      message: 'MCP initialization successful',
+      status: initialize.response.status,
+      message: 'MCP initialization and tools/list successful',
       server_name: serverInfo.name || null,
       server_version: serverInfo.version || null,
       protocol_version: protocolVersion,
-      capabilities: result.result.capabilities || {},
+      capabilities: initMessage.result.capabilities || {},
+      tools: allTools.map((tool) => ({
+        name: tool.name,
+        description: tool.description || '',
+      })),
+      tool_count: allTools.length,
+      session_id_present: Boolean(sessionId),
     };
   } catch (error: any) {
     return {
